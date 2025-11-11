@@ -32,14 +32,34 @@ async function init() {
 
    p.on('close', async function () {
       console.log('Build Complete');
-      const distFolderPath = path.join(__dirname, 'output', 'dist');
+      const possibleDirs = ['build', 'dist', 'out'];
+      let distFolderPath;
+
+      for (const dir of possibleDirs) {
+         const fullPath = path.join(__dirname, 'output', dir);
+
+         try {
+            const stat = await fs.lstat(fullPath);
+            if (stat.isDirectory()) {
+               distFolderPath = fullPath;
+               break;
+            }
+         } catch (err) {}
+      }
+
+      if (!distFolderPath) {
+         console.error('No build output folder found');
+         return;
+      }
+
+      // const distFolderPath = path.join(__dirname, 'output', 'dist');
       const distFolderContent = await fs.readdir(distFolderPath, {
          recursive: true,
       });
       console.log({ distFolderPath, distFolderContent });
+
       for (const filePath of distFolderContent) {
          const fullPath = path.join(distFolderPath, filePath);
-         console.log(filePath);
 
          const stat = await fs.lstat(fullPath);
 
