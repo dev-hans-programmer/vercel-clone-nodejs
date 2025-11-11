@@ -20,7 +20,7 @@ async function init() {
 
    const outputDir = path.join(__dirname, 'output');
 
-   const p = exec(`cd ${outputDir} && npm install & npm run build`);
+   const p = exec(`cd ${outputDir} && npm install && npm run build`);
 
    p.stdout.on('data', (data) => {
       console.log(`LOG:${data.toString()}`);
@@ -33,8 +33,10 @@ async function init() {
    p.on('close', async function () {
       console.log('Build Complete');
       const distFolderPath = path.join(__dirname, 'output', 'dist');
-      const distFolderContent = fs.readdir(distFolderPath, { recursive: true });
-
+      const distFolderContent = await fs.readdir(distFolderPath, {
+         recursive: true,
+      });
+      console.log({ distFolderPath, distFolderContent });
       for (const filePath of distFolderContent) {
          const fullPath = path.join(distFolderPath, filePath);
          console.log(filePath);
@@ -51,6 +53,7 @@ async function init() {
             ContentType: mime.lookup(fullPath),
          });
          await s3CLient.send(command);
+         console.log(`Uploaded ${filePath}`);
       }
       console.log('Done...');
    });
