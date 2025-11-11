@@ -6,10 +6,25 @@ const {
    DescribeTasksCommand,
 } = require('@aws-sdk/client-ecs');
 const express = require('express');
+const { Server } = require('socket.io');
+const Redis = require('ioredis');
 const PORT = 9000;
 
 const app = express();
 app.use(express.json());
+
+const subscriber = new Redis('redis://localhost:6379');
+
+const io = new Server({ cors: '*' });
+
+io.listen(9001, () => console.log('Socket running'));
+
+io.on('connection', (socket) => {
+   socket.on('subscribe', (channel) => {
+      socket.join(channel);
+      socket.emit('message', `Joined ${channel}`);
+   });
+});
 
 const ecsClient = new ECSClient({
    region: 'us-east-1',
@@ -90,5 +105,14 @@ app.get('/status', async (req, res) => {
       status: result.tasks[0].lastStatus,
    });
 });
+
+function initRedis() {
+   subscriber.psubscribe('logs:*');
+   subscriber.on('pmessage', (pattern, channel, message) => {
+      io.to(channel).emit('message', message);
+   });
+}
+
+initRedis();
 
 app.listen(PORT, () => console.log(`API Server running on ${PORT}`));

@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const mime = require('mime-types');
+const Redis = require('ioredis');
 
 const s3CLient = new S3Client({
    region: 'us-east-1',
@@ -15,8 +16,15 @@ const s3CLient = new S3Client({
 });
 
 const PROJECT_ID = process.env.PROJECT_ID || 'test_project';
+
+const publisher = new Redis('redis://localhost:6379');
+
+function publishLog(log) {
+   publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({ log }));
+}
 async function init() {
    console.log('Executing script.js');
+   publishLog('Build started');
 
    const outputDir = path.join(__dirname, 'output');
 
@@ -24,14 +32,17 @@ async function init() {
 
    p.stdout.on('data', (data) => {
       console.log(`LOG:${data.toString()}`);
+      publishLog(data.toString());
    });
 
    p.stdout.on('error', (data) => {
       console.log(`ERROR:${data.toString()}`);
+      publishLog(`Error: ${data.toString()}`);
    });
 
    p.on('close', async function () {
       console.log('Build Complete');
+      publishLog('Build complete');
       const possibleDirs = ['build', 'dist', 'out'];
       let distFolderPath;
 
@@ -52,6 +63,7 @@ async function init() {
          return;
       }
 
+      publishLog('Starting to upload');
       // const distFolderPath = path.join(__dirname, 'output', 'dist');
       const distFolderContent = await fs.readdir(distFolderPath, {
          recursive: true,
@@ -74,7 +86,9 @@ async function init() {
          });
          await s3CLient.send(command);
          console.log(`Uploaded ${filePath}`);
+         publishLog(`Uploaded ${filePath}`);
       }
+      publishLog('Done');
       console.log('Done...');
    });
 }
